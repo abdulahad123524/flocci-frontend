@@ -316,6 +316,32 @@ button:disabled {
   border-bottom: 0;
 }
 
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+}
+
+.row-actions .delete-button {
+  margin-right: 0;
+}
+
+.download-button {
+  align-self: center;
+  padding: 7px 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: #160b04;
+  background: var(--brass);
+  border: 0;
+}
+
+.download-button:hover {
+  background: #e3c45a;
+}
+
 .delete-button {
   align-self: center;
   margin-right: 12px;

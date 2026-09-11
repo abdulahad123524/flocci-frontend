@@ -44,6 +44,8 @@ export default function App() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
+  const [copySource, setCopySource] = useState("");
+  const [copyTarget, setCopyTarget] = useState("");
 
   const active = useMemo(
     () => buckets.find((b) => b.id === activeId) || null,
@@ -100,6 +102,8 @@ export default function App() {
     setPreview(null);
     setFile(null);
     setError("");
+    setCopySource(bucket.name);
+    if (copyTarget === bucket.name) setCopyTarget("");
     setStatus(`Opened ${bucket.name}`);
     try {
       await loadFiles(bucket.name);
@@ -107,17 +111,12 @@ export default function App() {
       setError(err.message);
     }
   };
-
   const createBucket = (e) => {
     e.preventDefault();
     const name = createName.trim().toLowerCase();
     setError("");
     if (!isBucketName(name)) {
       setError("Bucket name: 3-63 chars, lowercase, numbers, dots or hyphens.");
-      return;
-    }
-    if (buckets.some((b) => b.name === name)) {
-      setError("That bay already exists.");
       return;
     }
 
@@ -157,6 +156,40 @@ export default function App() {
       });
   };
 
+  const copyBucket = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!copySource || !copyTarget) {
+      setError("Pick a source and target bay.");
+      return;
+    }
+    if (copySource === copyTarget) {
+      setError("Source and target must be different.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/copy-bucket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceBucketName: copySource,
+          targetBucketName: copyTarget,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Could not copy bucket");
+      setStatus(`Copied ${data.copied || 0} file(s) ${copySource} → ${copyTarget}`);
+      const target = buckets.find((b) => b.name === copyTarget);
+      if (target) {
+        await openBucket(target);
+      } else {
+        await loadFiles(copyTarget);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const updateBucket = (e) => {
     e.preventDefault();
     if (!active) return;
@@ -178,6 +211,55 @@ export default function App() {
       ),
     );
     setStatus(`Bay updated: ${name}`);
+  };
+
+  const downloadFile = async (bucketName, key) => {
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/download-file?key=${encodeURIComponent(key)}&bucketName=${encodeURIComponent(bucketName)}`,
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Could not download file");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = key.split("/").pop() || key;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setStatus(`Downloaded ${key}`);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteObject = async (bucketName, key) => {
+    setError("");
+    try {
+      const res = await fetch("/api/delete-bucket-object", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucketName, key }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Could not delete file");
+      setBuckets((list) =>
+        list.map((b) =>
+          b.name === bucketName
+            ? { ...b, files: b.files.filter((f) => f.key !== key) }
+            : b,
+        ),
+      );
+      if (preview?.key === key) setPreview(null);
+      setStatus(`Removed ${key} from ${bucketName}`);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const deleteBucket = async (bucketName) => {
@@ -309,6 +391,57 @@ export default function App() {
               Stamp bay
             </button>
           </form>
+
+          <header className="subhead">
+            <h2>COPY BAY</h2>
+            <span className="count">copy objects</span>
+          </header>
+          {buckets.length < 2 ? (
+            <p className="empty">Need two bays to copy cargo.</p>
+          ) : (
+            <form className="form" onSubmit={copyBucket}>
+              <label>
+                Source bucket
+                <select
+                  value={copySource}
+                  onChange={(e) => {
+                    setCopySource(e.target.value);
+                    if (copyTarget === e.target.value) setCopyTarget("");
+                  }}
+                >
+                  <option value="">select source</option>
+                  {buckets.map((bucket) => (
+                    <option key={bucket.id} value={bucket.name}>
+                      {bucket.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Target bucket
+                <select
+                  value={copyTarget}
+                  onChange={(e) => setCopyTarget(e.target.value)}
+                >
+                  <option value="">select target</option>
+                  {buckets
+                    .filter((bucket) => bucket.name !== copySource)
+                    .map((bucket) => (
+                      <option key={bucket.id} value={bucket.name}>
+                        {bucket.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                className="primary"
+                type="submit"
+                disabled={!copySource || !copyTarget}
+              >
+                Copy bay
+              </button>
+            </form>
+          )}
 
           <header className="subhead">
             <h2>BAYS</h2>
@@ -451,36 +584,61 @@ export default function App() {
             <p className="empty">This bay is empty.</p>
           ) : (
             active.files.map((obj) => (
-              <button
+              <div
                 key={obj.key}
-                type="button"
-                className={`row ${preview?.key === obj.key ? "selected" : ""}`}
-                onClick={async () => {
-                  if (obj.text || obj.dataUrl) {
-                    setPreview(obj);
-                    return;
-                  }
-                  try {
-                    const res = await fetch(
-                      `/api/objects/${encodeURIComponent(obj.key)}?bucket=${encodeURIComponent(active.name)}`,
-                    );
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.message);
-                    setPreview({
-                      key: data.key,
-                      type: data.contentType,
-                      text: data.text,
-                      dataUrl: data.dataUrl,
-                    });
-                  } catch (err) {
-                    setError(err.message);
-                  }
-                }}
+                className={`bay-row ${preview?.key === obj.key ? "selected" : ""}`}
               >
-                <span className="stub" />
-                <span className="key">{obj.key}</span>
-                <span className="meta">{formatBytes(obj.size)}</span>
-              </button>
+                <button
+                  type="button"
+                  className={`row ${preview?.key === obj.key ? "selected" : ""}`}
+                  onClick={async () => {
+                    if (obj.text || obj.dataUrl) {
+                      setPreview(obj);
+                      return;
+                    }
+                    try {
+                      const res = await fetch("api/delete-bucket-object", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          bucketName: active.name,
+                          key: obj.key,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.message);
+                      setPreview({
+                        key: data.key,
+                        type: data.contentType,
+                        text: data.text,
+                        dataUrl: data.dataUrl,
+                      });
+                    } catch (err) {
+                      setError(err.message);
+                    }
+                  }}
+                >
+                  <span className="stub" />
+                  <span className="key">{obj.key}</span>
+                  <span className="meta">{formatBytes(obj.size)}</span>
+                </button>
+                <div className="row-actions">
+                  <button
+                    type="button"
+                    className="download-button"
+                    onClick={() => downloadFile(active.name, obj.key)}
+                  >
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => deleteObject(active.name, obj.key)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             ))
           )}
         </section>
