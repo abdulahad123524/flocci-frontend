@@ -12,9 +12,40 @@ const NAV = [
   { id: "tags", label: "Tags", index: "02" },
   { id: "encrypt", label: "Encrypt", index: "03" },
   { id: "cors", label: "CORS", index: "04" },
-  { id: "storage", label: "Storage", index: "05" },
-  { id: "backup", label: "Backup", index: "06" },
+  { id: "block", label: "Block", index: "05" },
+  { id: "storage", label: "Storage", index: "06" },
+  { id: "backup", label: "Backup", index: "07" },
 ];
+
+const BLOCK_FLAGS = [
+  {
+    key: "BlockPublicAcls",
+    label: "Block public ACLs",
+    hint: "Reject new public ACLs on this bay",
+  },
+  {
+    key: "IgnorePublicAcls",
+    label: "Ignore public ACLs",
+    hint: "Ignore any public ACLs already on objects",
+  },
+  {
+    key: "BlockPublicPolicy",
+    label: "Block public policy",
+    hint: "Reject a bucket policy that grants public access",
+  },
+  {
+    key: "RestrictPublicBuckets",
+    label: "Restrict public buckets",
+    hint: "Limit public policy access to this account only",
+  },
+];
+
+const EMPTY_BLOCK_POLICY = {
+  BlockPublicAcls: false,
+  IgnorePublicAcls: false,
+  BlockPublicPolicy: false,
+  RestrictPublicBuckets: false,
+};
 
 const STORAGE_TIERS = [
   { name: "Standard", used: "1.4 TB", share: 58, note: "hot objects" },
@@ -51,6 +82,14 @@ const NavIcon = ({ id }) => {
         <circle cx="12" cy="12" r="9" />
         <path d="M3 12h18" />
         <ellipse cx="12" cy="12" rx="4" ry="9" />
+      </svg>
+    );
+  }
+  if (id === "block") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M7 7l10 10" />
       </svg>
     );
   }
@@ -144,6 +183,10 @@ export default function App() {
     "DELETE",
   ]);
   const [corsBusy, setCorsBusy] = useState(false);
+  const [blockBucketName, setBlockBucketName] = useState("");
+  const [blockAccess, setBlockAccess] = useState(null);
+  const [blockPolicy, setBlockPolicy] = useState(EMPTY_BLOCK_POLICY);
+  const [blockBusy, setBlockBusy] = useState(false);
 
   const active = useMemo(
     () => buckets.find((b) => b.id === activeId) || null,
@@ -174,7 +217,10 @@ export default function App() {
       const data = await res.json().catch(() => ({}));
 
       console.log("data", data);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setError(data.message || "Could not load buckets");
+        return;
+      }
       const next = (data.buckets || []).map((bucket) => ({
         id: bucket.name,
         name: bucket.name,
@@ -196,8 +242,8 @@ export default function App() {
         }),
       );
       setBuckets(withVersioning);
-    } catch {
-      // Keep local list if listing is not available yet
+    } catch (err) {
+      setError(err.message || "Could not load buckets");
     }
   };
 
@@ -287,6 +333,40 @@ export default function App() {
       });
   }, [view, corsBucketName]);
 
+  useEffect(() => {
+    if (view !== "block") return;
+    if (!blockBucketName) {
+      setBlockAccess(null);
+      setBlockPolicy(EMPTY_BLOCK_POLICY);
+      return;
+    }
+    setError("");
+    fetch(
+      `/api/bucket-block-access?bucketName=${encodeURIComponent(blockBucketName)}`,
+    )
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.message || "Could not load block access");
+        }
+        const policy = { ...EMPTY_BLOCK_POLICY, ...(data.policy || {}) };
+        setBlockAccess(data);
+        setBlockPolicy(policy);
+        setStatus(
+          data.configured
+            ? data.blockAll
+              ? `${blockBucketName} blocks all public access`
+              : `Loaded block access for ${blockBucketName}`
+            : `${blockBucketName} has no block access rules`,
+        );
+      })
+      .catch((err) => {
+        setBlockAccess(null);
+        setBlockPolicy(EMPTY_BLOCK_POLICY);
+        setError(err.message);
+      });
+  }, [view, blockBucketName]);
+
   const saveBucketCors = async (e) => {
     e.preventDefault();
     if (!corsBucketName) {
@@ -350,6 +430,79 @@ export default function App() {
         ? list.filter((item) => item !== method)
         : [...list, method],
     );
+  };
+
+  const toggleBlockFlag = (key) => {
+    setBlockPolicy((policy) => ({ ...policy, [key]: !policy[key] }));
+  };
+
+  const toggleBlockAll = () => {
+    const next = !Object.values(blockPolicy).every(Boolean);
+    setBlockPolicy({
+      BlockPublicAcls: next,
+      IgnorePublicAcls: next,
+      BlockPublicPolicy: next,
+      RestrictPublicBuckets: next,
+    });
+  };
+
+  const saveBlockAccess = async (e) => {
+    e.preventDefault();
+    if (!blockBucketName) {
+      setError("Pick a bucket first");
+      return;
+    }
+    setError("");
+    setBlockBusy(true);
+    try {
+      const res = await fetch("/api/bucket-block-access", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucketName: blockBucketName,
+          policy: blockPolicy,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Could not save block access");
+      const policy = { ...EMPTY_BLOCK_POLICY, ...(data.policy || {}) };
+      setBlockAccess(data);
+      setBlockPolicy(policy);
+      setStatus(
+        data.blockAll
+          ? `Blocked all public access on ${blockBucketName}`
+          : `Block access saved on ${blockBucketName}`,
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBlockBusy(false);
+    }
+  };
+
+  const removeBlockAccess = async () => {
+    if (!blockBucketName) return;
+    setError("");
+    setBlockBusy(true);
+    try {
+      const res = await fetch("/api/bucket-block-access", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucketName: blockBucketName }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Could not remove block access");
+      }
+      const policy = { ...EMPTY_BLOCK_POLICY, ...(data.policy || {}) };
+      setBlockAccess(data);
+      setBlockPolicy(policy);
+      setStatus(`Block access removed from ${blockBucketName}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBlockBusy(false);
+    }
   };
 
   const enableBucketEncryption = async () => {
@@ -769,6 +922,9 @@ export default function App() {
                 if (item.id === "cors") {
                   setCorsBucketName(active?.name || buckets[0]?.name || "");
                 }
+                if (item.id === "block") {
+                  setBlockBucketName(active?.name || buckets[0]?.name || "");
+                }
               }}
             >
               <span className="nav-index">{item.index}</span>
@@ -794,9 +950,11 @@ export default function App() {
                   ? "Cipher lock"
                   : view === "cors"
                     ? "Origin gate"
-                    : view === "storage"
-                      ? "Object store"
-                      : "Snapshot dock"}
+                    : view === "block"
+                      ? "Public gate"
+                      : view === "storage"
+                        ? "Object store"
+                        : "Snapshot dock"}
           </p>
           <h1>
             {view === "bucket"
@@ -807,9 +965,11 @@ export default function App() {
                   ? "ENCRYPT"
                   : view === "cors"
                     ? "CORS"
-                    : view === "storage"
-                      ? "STORAGE"
-                      : "BACKUP"}
+                    : view === "block"
+                      ? "BLOCK"
+                      : view === "storage"
+                        ? "STORAGE"
+                        : "BACKUP"}
           </h1>
         </div>
         <dl className="ticket">
@@ -845,6 +1005,19 @@ export default function App() {
               <dt>CORS rules</dt>
               <dd>{corsRules.length}</dd>
             </>
+          ) : view === "block" ? (
+            <>
+              <dt>Gated bay</dt>
+              <dd>{blockBucketName || "none selected"}</dd>
+              <dt>Public access</dt>
+              <dd>
+                {blockAccess?.blockAll
+                  ? "blocked"
+                  : blockAccess?.configured
+                    ? "partial"
+                    : "open"}
+              </dd>
+            </>
           ) : view === "storage" ? (
             <>
               <dt>Capacity</dt>
@@ -867,6 +1040,15 @@ export default function App() {
           </dd>
         </dl>
       </header>
+
+      {(error || status) && (
+        <p
+          className={`banner ${error ? "err" : ""}`}
+          role={error ? "alert" : "status"}
+        >
+          {error || status}
+        </p>
+      )}
 
       {view === "bucket" && (
       <div className="yard">
@@ -1543,6 +1725,115 @@ export default function App() {
         </div>
       )}
 
+      {view === "block" && (
+        <div className="stage">
+          <section className="panel bays">
+            <header>
+              <h2>SET BLOCK</h2>
+              <span className="count">PUT /bucket-block-access</span>
+            </header>
+            {buckets.length === 0 ? (
+              <p className="empty">Stamp a bay before you set block access.</p>
+            ) : (
+              <form className="form" onSubmit={saveBlockAccess}>
+                <label>
+                  Bucket
+                  <select
+                    value={blockBucketName}
+                    onChange={(e) => setBlockBucketName(e.target.value)}
+                  >
+                    <option value="">select bucket</option>
+                    {buckets.map((bucket) => (
+                      <option key={bucket.id} value={bucket.name}>
+                        {bucket.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <fieldset className="method-set">
+                  <legend>Public access</legend>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={Object.values(blockPolicy).every(Boolean)}
+                      onChange={toggleBlockAll}
+                    />
+                    Block all public access
+                  </label>
+                </fieldset>
+                <fieldset className="method-set">
+                  <legend>Settings</legend>
+                  {BLOCK_FLAGS.map((flag) => (
+                    <label key={flag.key} className="check block-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(blockPolicy[flag.key])}
+                        onChange={() => toggleBlockFlag(flag.key)}
+                      />
+                      <span>
+                        {flag.label}
+                        <small>{flag.hint}</small>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+                <button
+                  className="primary"
+                  type="submit"
+                  disabled={blockBusy || !blockBucketName}
+                >
+                  Save block access
+                </button>
+                <button
+                  className="ghost"
+                  type="button"
+                  disabled={
+                    blockBusy || !blockBucketName || !blockAccess?.configured
+                  }
+                  onClick={removeBlockAccess}
+                >
+                  Remove block access
+                </button>
+              </form>
+            )}
+          </section>
+          <section className="panel snaps">
+            <header>
+              <h2>POLICY</h2>
+              <span className="count">GET /bucket-block-access</span>
+            </header>
+            {!blockBucketName ? (
+              <p className="empty">Pick a bay to load block access.</p>
+            ) : !blockAccess ? (
+              <p className="empty">Loading block access…</p>
+            ) : (
+              <dl className="version-data block-data">
+                <div>
+                  <dt>Bucket</dt>
+                  <dd>{blockAccess.bucketName}</dd>
+                </div>
+                <div>
+                  <dt>Configured</dt>
+                  <dd>{blockAccess.configured ? "yes" : "no"}</dd>
+                </div>
+                <div>
+                  <dt>Block all</dt>
+                  <dd>{blockAccess.blockAll ? "on" : "off"}</dd>
+                </div>
+                {BLOCK_FLAGS.map((flag) => (
+                  <div key={flag.key}>
+                    <dt>{flag.label}</dt>
+                    <dd>
+                      {blockAccess.policy?.[flag.key] ? "blocked" : "allowed"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
+        </div>
+      )}
+
       {view === "storage" && (
         <div className="stage">
           <section className="panel capacity">
@@ -1631,7 +1922,6 @@ export default function App() {
         </div>
       )}
 
-      <p className={`status ${error ? "err" : ""}`}>{error || status}</p>
       </div>
     </div>
   );
