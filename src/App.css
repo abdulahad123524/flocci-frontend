@@ -537,6 +537,18 @@ button {
   color: #160b04;
 }
 
+.button-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid rgba(22, 11, 4, 0.35);
+  border-top-color: #160b04;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin 0.7s linear infinite;
+}
+
 .ghost {
   background: transparent;
   color: var(--paper);
@@ -864,6 +876,12 @@ button:disabled {
   }
   50% {
     opacity: 0.35;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
