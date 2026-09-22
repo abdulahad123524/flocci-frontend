@@ -22,6 +22,7 @@ import {
   updateBucketTags,
   updateBucketVersioning,
   uploadObject,
+  uploadMultipartObject,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
@@ -468,12 +469,21 @@ export default function useVaultController() {
     setError("");
     setUploadBusy(true);
     try {
-      const content = await readFileAsBase64(file);
-      if (!content) {
-        setError("Could not read the selected file.");
-        return;
+      if (file.size > 20 * 1024 * 1024) {
+        // Use multipart for files > 20MB
+        await uploadMultipartObject({ 
+            filename: file.name, 
+            contentType: file.type || "application/octet-stream", 
+            bucketName: active.name 
+        });
+      } else {
+        const content = await readFileAsBase64(file);
+        if (!content) {
+          setError("Could not read the selected file.");
+          return;
+        }
+        await uploadObject({ filename: file.name, content, contentType: file.type || "application/octet-stream", bucketName: active.name });
       }
-      await uploadObject({ filename: file.name, content, contentType: file.type || "application/octet-stream", bucketName: active.name });
       const previewData = await readFilePreview(file);
       const entry = { key: file.name, size: file.size, type: file.type || "application/octet-stream", ...previewData };
       setBuckets((list) => list.map((bucket) => bucket.id === active.id ? { ...bucket, files: [entry, ...bucket.files.filter((item) => item.key !== file.name)] } : bucket));

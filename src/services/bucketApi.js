@@ -159,6 +159,16 @@ export const uploadObject = async (payload) => {
   return readResponse(response, "Upload failed");
 };
 
+export const uploadMultipartObject = async (payload) => {
+  const response = await fetch("/api/multipart-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return readResponse(response, "Multipart upload failed");
+};
+
+
 export const downloadObject = async (bucketName, key) => {
   const response = await fetch(
     `/api/download-file?key=${encodeURIComponent(key)}&bucketName=${encodeURIComponent(bucketName)}`,
