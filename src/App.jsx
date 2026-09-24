@@ -7,6 +7,7 @@ import BackupScreen from "./screens/BackupScreen";
 import BucketScreen from "./screens/BucketScreen";
 import CorsScreen from "./screens/CorsScreen";
 import EncryptionScreen from "./screens/EncryptionScreen";
+import NotificationScreen from "./screens/NotificationScreen";
 import StorageScreen from "./screens/StorageScreen";
 import TagsScreen from "./screens/TagsScreen";
 
@@ -28,6 +29,9 @@ function ScreenContent({ view, state, actions, blockFlags }) {
   if (view === "block") {
     return <BlockScreen state={screenState} actions={actions} />;
   }
+  if (view === "notification") {
+    return <NotificationScreen state={state} actions={actions} />;
+  }
   if (view === "storage") {
     return <StorageScreen />;
   }
@@ -47,6 +51,8 @@ function getHeaderStats(state) {
     corsRules,
     blockBucketName,
     blockAccess,
+    notificationBucketName,
+    notificationRules,
   } = state;
 
   if (view === "bucket") {
@@ -81,6 +87,12 @@ function getHeaderStats(state) {
         label: "Public access",
         value: blockAccess?.blockAll ? "blocked" : blockAccess?.configured ? "partial" : "open",
       },
+    ];
+  }
+  if (view === "notification") {
+    return [
+      { label: "Alert bay", value: notificationBucketName || "none selected" },
+      { label: "Notification rules", value: notificationRules.length },
     ];
   }
   if (view === "storage") {

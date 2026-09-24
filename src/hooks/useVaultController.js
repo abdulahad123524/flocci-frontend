@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getObject } from "../services/objectApi";
 import {
   copyBucket as copyBucketRequest,
+  configureBucketNotification as configureBucketNotificationRequest,
   createBucket as createBucketRequest,
   deleteBucket as deleteBucketRequest,
   deleteBucketBlockAccess,
@@ -13,24 +14,43 @@ import {
   getBucketBlockAccess,
   getBucketCors,
   getBucketEncryption,
+  getBucketNotification,
   getBucketTags,
   getBucketVersioning,
   listBuckets,
   listObjects,
   updateBucketBlockAccess,
   updateBucketCors,
+  updateBucketNotification,
   updateBucketTags,
   updateBucketVersioning,
+  deleteBucketNotification,
   uploadObject,
   uploadMultipartObject,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
 export const BLOCK_FLAGS = [
-  { key: "BlockPublicAcls", label: "Block public ACLs", hint: "Reject new public ACLs on this bay" },
-  { key: "IgnorePublicAcls", label: "Ignore public ACLs", hint: "Ignore any public ACLs already on objects" },
-  { key: "BlockPublicPolicy", label: "Block public policy", hint: "Reject a bucket policy that grants public access" },
-  { key: "RestrictPublicBuckets", label: "Restrict public buckets", hint: "Limit public policy access to this account only" },
+  {
+    key: "BlockPublicAcls",
+    label: "Block public ACLs",
+    hint: "Reject new public ACLs on this bay",
+  },
+  {
+    key: "IgnorePublicAcls",
+    label: "Ignore public ACLs",
+    hint: "Ignore any public ACLs already on objects",
+  },
+  {
+    key: "BlockPublicPolicy",
+    label: "Block public policy",
+    hint: "Reject a bucket policy that grants public access",
+  },
+  {
+    key: "RestrictPublicBuckets",
+    label: "Restrict public buckets",
+    hint: "Limit public policy access to this account only",
+  },
 ];
 
 export const EMPTY_BLOCK_POLICY = {
@@ -86,12 +106,86 @@ export default function useVaultController() {
   const [corsHeaders, setCorsHeaders] = useState("*");
   const [corsExposeHeaders, setCorsExposeHeaders] = useState("");
   const [corsMaxAge, setCorsMaxAge] = useState("3000");
-  const [corsMethods, setCorsMethods] = useState(["GET", "HEAD", "PUT", "POST", "DELETE"]);
+  const [corsMethods, setCorsMethods] = useState([
+    "GET",
+    "HEAD",
+    "PUT",
+    "POST",
+    "DELETE",
+  ]);
   const [corsBusy, setCorsBusy] = useState(false);
   const [blockBucketName, setBlockBucketName] = useState("");
   const [blockAccess, setBlockAccess] = useState(null);
   const [blockPolicy, setBlockPolicy] = useState(EMPTY_BLOCK_POLICY);
   const [blockBusy, setBlockBusy] = useState(false);
+
+  const [notificationBucketName, setNotificationBucketName] = useState("");
+  const [notificationConfig, setNotificationConfig] = useState("");
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationRules, setNotificationRules] = useState([]);
+
+  const loadBucketNotification = async (bucketName) => {
+    if (!bucketName) {
+      setNotificationRules([]);
+      setNotificationConfig("");
+      return;
+    }
+    setError("");
+    try {
+      const data = await getBucketNotification(bucketName);
+      const rules = [
+        ...(data.LambdaFunctionConfigurations || []),
+        ...(data.QueueConfigurations || []),
+        ...(data.TopicConfigurations || []),
+      ];
+      setNotificationRules(rules);
+      setNotificationConfig(JSON.stringify(data, null, 2));
+      setStatus(
+        rules.length
+          ? `Loaded ${rules.length} notification rule(s) for ${bucketName}`
+          : `${bucketName} has no notification rules`,
+      );
+    } catch (err) {
+      setNotificationRules([]);
+      setNotificationConfig("");
+      setError(err.message);
+    }
+  };
+
+  const saveBucketNotification = async (event) => {
+    event.preventDefault();
+    if (!notificationBucketName) return setError("Pick a bucket first");
+    await runAction(async () => {
+      const data = await updateBucketNotification({
+        bucketName: notificationBucketName,
+        config: JSON.parse(notificationConfig),
+      });
+      setNotificationRules(data.rules || []);
+      setStatus(`Notification saved on ${notificationBucketName}`);
+    }, setNotificationBusy);
+  };
+
+  const configureBucketNotification = async (event) => {
+    event.preventDefault();
+    if (!notificationBucketName) return setError("Pick a bucket first");
+    await runAction(async () => {
+      const data = await configureBucketNotificationRequest({
+        bucketName: notificationBucketName,
+        notificationConfig: JSON.parse(notificationConfig),
+      });
+      setNotificationRules(data.rules || []);
+      setStatus(`Notification configured on ${notificationBucketName}`);
+    }, setNotificationBusy);
+  };
+
+  const removeBucketNotification = async () => {
+    if (!notificationBucketName) return;
+    await runAction(async () => {
+      const data = await deleteBucketNotification(notificationBucketName);
+      setNotificationRules(data.rules || []);
+      setStatus(`Notification removed from ${notificationBucketName}`);
+    }, setNotificationBusy);
+  };
 
   const active = useMemo(
     () => buckets.find((bucket) => bucket.id === activeId) || null,
@@ -99,7 +193,11 @@ export default function useVaultController() {
   );
 
   const applyVersioning = (bucketName, info) =>
-    setBuckets((list) => list.map((bucket) => (bucket.name === bucketName ? { ...bucket, ...info } : bucket)));
+    setBuckets((list) =>
+      list.map((bucket) =>
+        bucket.name === bucketName ? { ...bucket, ...info } : bucket,
+      ),
+    );
 
   const loadVersioning = async (bucketName) => {
     const info = await getBucketVersioning(bucketName);
@@ -109,22 +207,30 @@ export default function useVaultController() {
 
   const loadFiles = async (bucketName) => {
     const files = await listObjects(bucketName);
-    setBuckets((list) => list.map((bucket) => (bucket.name === bucketName ? { ...bucket, files } : bucket)));
+    setBuckets((list) =>
+      list.map((bucket) =>
+        bucket.name === bucketName ? { ...bucket, files } : bucket,
+      ),
+    );
     return files;
   };
 
   const loadBuckets = async () => {
     try {
       const data = await listBuckets();
-      const next = (data.buckets || []).map((bucket) => emptyBucket(bucket.name));
+      const next = (data.buckets || []).map((bucket) =>
+        emptyBucket(bucket.name),
+      );
       setBuckets(next);
-      const withVersioning = await Promise.all(next.map(async (bucket) => {
-        try {
-          return { ...bucket, ...(await getBucketVersioning(bucket.name)) };
-        } catch {
-          return bucket;
-        }
-      }));
+      const withVersioning = await Promise.all(
+        next.map(async (bucket) => {
+          try {
+            return { ...bucket, ...(await getBucketVersioning(bucket.name)) };
+          } catch {
+            return bucket;
+          }
+        }),
+      );
       setBuckets(withVersioning);
     } catch (err) {
       setError(err.message || "Could not load buckets");
@@ -159,7 +265,11 @@ export default function useVaultController() {
     getBucketEncryption(encryptBucketName)
       .then((data) => {
         setEncryption(data);
-        setStatus(data.encrypted ? `${encryptBucketName} encrypted with ${data.algorithm}` : `${encryptBucketName} is not encrypted`);
+        setStatus(
+          data.encrypted
+            ? `${encryptBucketName} encrypted with ${data.algorithm}`
+            : `${encryptBucketName} is not encrypted`,
+        );
       })
       .catch((err) => {
         setEncryption(null);
@@ -192,7 +302,11 @@ export default function useVaultController() {
           setCorsMaxAge("3000");
           setCorsMethods(["GET", "HEAD", "PUT", "POST", "DELETE"]);
         }
-        setStatus(rules.length ? `Loaded ${rules.length} CORS rule(s) for ${corsBucketName}` : `${corsBucketName} has no CORS rules`);
+        setStatus(
+          rules.length
+            ? `Loaded ${rules.length} CORS rule(s) for ${corsBucketName}`
+            : `${corsBucketName} has no CORS rules`,
+        );
       })
       .catch((err) => {
         setCorsRules([]);
@@ -213,7 +327,13 @@ export default function useVaultController() {
         const policy = { ...EMPTY_BLOCK_POLICY, ...(data.policy || {}) };
         setBlockAccess(data);
         setBlockPolicy(policy);
-        setStatus(data.configured ? (data.blockAll ? `${blockBucketName} blocks all public access` : `Loaded block access for ${blockBucketName}`) : `${blockBucketName} has no block access rules`);
+        setStatus(
+          data.configured
+            ? data.blockAll
+              ? `${blockBucketName} blocks all public access`
+              : `Loaded block access for ${blockBucketName}`
+            : `${blockBucketName} has no block access rules`,
+        );
       })
       .catch((err) => {
         setBlockAccess(null);
@@ -221,6 +341,14 @@ export default function useVaultController() {
         setError(err.message);
       });
   }, [view, blockBucketName]);
+
+  useEffect(() => {
+    if (view !== "notification") return;
+    if (!notificationBucketName) {
+      return;
+    }
+    loadBucketNotification(notificationBucketName);
+  }, [view, notificationBucketName]);
 
   const runAction = async (action, busySetter) => {
     setError("");
@@ -239,7 +367,14 @@ export default function useVaultController() {
     if (!corsBucketName) return setError("Pick a bucket first");
     if (!corsMethods.length) return setError("Pick at least one CORS method");
     await runAction(async () => {
-      const data = await updateBucketCors({ bucketName: corsBucketName, allowedOrigins: corsOrigins, allowedHeaders: corsHeaders, allowedMethods: corsMethods, exposeHeaders: corsExposeHeaders, maxAgeSeconds: Number(corsMaxAge) || 3000 });
+      const data = await updateBucketCors({
+        bucketName: corsBucketName,
+        allowedOrigins: corsOrigins,
+        allowedHeaders: corsHeaders,
+        allowedMethods: corsMethods,
+        exposeHeaders: corsExposeHeaders,
+        maxAgeSeconds: Number(corsMaxAge) || 3000,
+      });
       setCorsRules(data.rules || []);
       setStatus(`CORS saved on ${corsBucketName}`);
     }, setCorsBusy);
@@ -254,11 +389,21 @@ export default function useVaultController() {
     }, setCorsBusy);
   };
 
-  const toggleCorsMethod = (method) => setCorsMethods((list) => list.includes(method) ? list.filter((item) => item !== method) : [...list, method]);
-  const toggleBlockFlag = (key) => setBlockPolicy((policy) => ({ ...policy, [key]: !policy[key] }));
+  const toggleCorsMethod = (method) =>
+    setCorsMethods((list) =>
+      list.includes(method)
+        ? list.filter((item) => item !== method)
+        : [...list, method],
+    );
+  const toggleBlockFlag = (key) =>
+    setBlockPolicy((policy) => ({ ...policy, [key]: !policy[key] }));
   const toggleBlockAll = () => {
     const next = !Object.values(blockPolicy).every(Boolean);
-    setBlockPolicy(Object.fromEntries(Object.keys(EMPTY_BLOCK_POLICY).map((key) => [key, next])));
+    setBlockPolicy(
+      Object.fromEntries(
+        Object.keys(EMPTY_BLOCK_POLICY).map((key) => [key, next]),
+      ),
+    );
   };
 
   const saveBlockAccess = async (event) => {
@@ -269,7 +414,11 @@ export default function useVaultController() {
       const policy = { ...EMPTY_BLOCK_POLICY, ...(data.policy || {}) };
       setBlockAccess(data);
       setBlockPolicy(policy);
-      setStatus(data.blockAll ? `Blocked all public access on ${blockBucketName}` : `Block access saved on ${blockBucketName}`);
+      setStatus(
+        data.blockAll
+          ? `Blocked all public access on ${blockBucketName}`
+          : `Block access saved on ${blockBucketName}`,
+      );
     }, setBlockBusy);
   };
 
@@ -313,7 +462,10 @@ export default function useVaultController() {
     const key = tagKey.trim();
     if (!key) return setError("Tag key is required");
     await runAction(async () => {
-      const next = [...bucketTags.filter((tag) => (tag.Key || tag.key) !== key), { Key: key, Value: tagValue }];
+      const next = [
+        ...bucketTags.filter((tag) => (tag.Key || tag.key) !== key),
+        { Key: key, Value: tagValue },
+      ];
       await saveBucketTags(tagBucket, next);
       setTagKey("");
       setTagValue("");
@@ -324,7 +476,10 @@ export default function useVaultController() {
   const removeBucketTag = async (key) => {
     if (!tagBucket) return;
     await runAction(async () => {
-      await saveBucketTags(tagBucket, bucketTags.filter((tag) => (tag.Key || tag.key) !== key));
+      await saveBucketTags(
+        tagBucket,
+        bucketTags.filter((tag) => (tag.Key || tag.key) !== key),
+      );
       setStatus(`Removed tag ${key} from ${tagBucket}`);
     }, setTagBusy);
   };
@@ -360,11 +515,16 @@ export default function useVaultController() {
     event.preventDefault();
     const name = createName.trim().toLowerCase();
     setError("");
-    if (!isBucketName(name)) return setError("Bucket name: 3-63 chars, lowercase, numbers, dots or hyphens.");
+    if (!isBucketName(name))
+      return setError(
+        "Bucket name: 3-63 chars, lowercase, numbers, dots or hyphens.",
+      );
     try {
       await createBucketRequest(name);
       const bucket = emptyBucket(name, createRegion);
-      setBuckets((list) => list.some((item) => item.name === name) ? list : [bucket, ...list]);
+      setBuckets((list) =>
+        list.some((item) => item.name === name) ? list : [bucket, ...list],
+      );
       setCreateName("");
       setActiveId(name);
       setEditName(name);
@@ -384,11 +544,15 @@ export default function useVaultController() {
   const copyBucket = async (event) => {
     event.preventDefault();
     setError("");
-    if (!copySource || !copyTarget) return setError("Pick a source and target bay.");
-    if (copySource === copyTarget) return setError("Source and target must be different.");
+    if (!copySource || !copyTarget)
+      return setError("Pick a source and target bay.");
+    if (copySource === copyTarget)
+      return setError("Source and target must be different.");
     try {
       const data = await copyBucketRequest(copySource, copyTarget);
-      setStatus(`Copied ${data.copied || 0} file(s) ${copySource} -> ${copyTarget}`);
+      setStatus(
+        `Copied ${data.copied || 0} file(s) ${copySource} -> ${copyTarget}`,
+      );
       const target = buckets.find((bucket) => bucket.name === copyTarget);
       if (target) await openBucket(target);
       else await loadFiles(copyTarget);
@@ -402,9 +566,21 @@ export default function useVaultController() {
     if (!active) return;
     const name = editName.trim().toLowerCase();
     setError("");
-    if (!isBucketName(name)) return setError("Bucket name: 3-63 chars, lowercase, numbers, dots or hyphens.");
-    if (buckets.some((bucket) => bucket.name === name && bucket.id !== active.id)) return setError("Another bay already uses that name.");
-    setBuckets((list) => list.map((bucket) => bucket.id === active.id ? { ...bucket, name, region: editRegion, note: editNote.trim() } : bucket));
+    if (!isBucketName(name))
+      return setError(
+        "Bucket name: 3-63 chars, lowercase, numbers, dots or hyphens.",
+      );
+    if (
+      buckets.some((bucket) => bucket.name === name && bucket.id !== active.id)
+    )
+      return setError("Another bay already uses that name.");
+    setBuckets((list) =>
+      list.map((bucket) =>
+        bucket.id === active.id
+          ? { ...bucket, name, region: editRegion, note: editNote.trim() }
+          : bucket,
+      ),
+    );
     setStatus(`Bay updated: ${name}`);
   };
 
@@ -430,7 +606,16 @@ export default function useVaultController() {
     setError("");
     try {
       await deleteObjectRequest(bucketName, key);
-      setBuckets((list) => list.map((bucket) => bucket.name === bucketName ? { ...bucket, files: bucket.files.filter((fileItem) => fileItem.key !== key) } : bucket));
+      setBuckets((list) =>
+        list.map((bucket) =>
+          bucket.name === bucketName
+            ? {
+                ...bucket,
+                files: bucket.files.filter((fileItem) => fileItem.key !== key),
+              }
+            : bucket,
+        ),
+      );
       if (preview?.key === key) setPreview(null);
       setStatus(`Removed ${key} from ${bucketName}`);
     } catch (err) {
@@ -471,10 +656,10 @@ export default function useVaultController() {
     try {
       if (file.size > 20 * 1024 * 1024) {
         // Use multipart for files > 20MB
-        await uploadMultipartObject({ 
-            filename: file.name, 
-            contentType: file.type || "application/octet-stream", 
-            bucketName: active.name 
+        await uploadMultipartObject({
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+          bucketName: active.name,
         });
       } else {
         const content = await readFileAsBase64(file);
@@ -482,11 +667,33 @@ export default function useVaultController() {
           setError("Could not read the selected file.");
           return;
         }
-        await uploadObject({ filename: file.name, content, contentType: file.type || "application/octet-stream", bucketName: active.name });
+        await uploadObject({
+          filename: file.name,
+          content,
+          contentType: file.type || "application/octet-stream",
+          bucketName: active.name,
+        });
       }
       const previewData = await readFilePreview(file);
-      const entry = { key: file.name, size: file.size, type: file.type || "application/octet-stream", ...previewData };
-      setBuckets((list) => list.map((bucket) => bucket.id === active.id ? { ...bucket, files: [entry, ...bucket.files.filter((item) => item.key !== file.name)] } : bucket));
+      const entry = {
+        key: file.name,
+        size: file.size,
+        type: file.type || "application/octet-stream",
+        ...previewData,
+      };
+      setBuckets((list) =>
+        list.map((bucket) =>
+          bucket.id === active.id
+            ? {
+                ...bucket,
+                files: [
+                  entry,
+                  ...bucket.files.filter((item) => item.key !== file.name),
+                ],
+              }
+            : bucket,
+        ),
+      );
       setStatus(`Stowed ${file.name} in ${active.name}`);
       setFile(null);
       setPreview(entry);
@@ -501,7 +708,12 @@ export default function useVaultController() {
     if (object.text || object.dataUrl) return setPreview(object);
     try {
       const data = await getObject(bucketName, object.key);
-      setPreview({ key: data.key, type: data.contentType, text: data.text, dataUrl: data.dataUrl });
+      setPreview({
+        key: data.key,
+        type: data.contentType,
+        text: data.text,
+        dataUrl: data.dataUrl,
+      });
     } catch (err) {
       setError(err.message);
     }
@@ -514,27 +726,103 @@ export default function useVaultController() {
     if (nextView === "encrypt") setEncryptBucketName(bucketName);
     if (nextView === "cors") setCorsBucketName(bucketName);
     if (nextView === "block") setBlockBucketName(bucketName);
+    if (nextView === "notification") setNotificationBucketName(bucketName);
   };
 
   return {
     state: {
-      inputRef, buckets, activeId, active, createName, createRegion, editName,
-      editRegion, editNote, file, uploadBusy, drag, status, error, preview, copySource,
-      copyTarget, view, versionBusy, tagBucket, bucketTags, tagKey, tagValue,
-      tagBusy, encryptBucketName, encryption, encryptBusy, corsBucketName,
-      corsRules, corsOrigins, corsHeaders, corsExposeHeaders, corsMaxAge,
-      corsMethods, corsBusy, blockBucketName, blockAccess, blockPolicy, blockBusy,
+      inputRef,
+      buckets,
+      activeId,
+      active,
+      createName,
+      createRegion,
+      editName,
+      editRegion,
+      editNote,
+      file,
+      uploadBusy,
+      drag,
+      status,
+      error,
+      preview,
+      copySource,
+      copyTarget,
+      view,
+      versionBusy,
+      tagBucket,
+      bucketTags,
+      tagKey,
+      tagValue,
+      tagBusy,
+      encryptBucketName,
+      encryption,
+      encryptBusy,
+      corsBucketName,
+      corsRules,
+      corsOrigins,
+      corsHeaders,
+      corsExposeHeaders,
+      corsMaxAge,
+      corsMethods,
+      corsBusy,
+      blockBucketName,
+      blockAccess,
+      blockPolicy,
+      blockBusy,
+      notificationBucketName,
+      notificationConfig,
+      notificationBusy,
+      notificationRules,
     },
     actions: {
-      setCreateName, setCreateRegion, setEditName, setEditRegion, setEditNote,
-      setCopySource, setCopyTarget, setDrag, setTagBucket, setTagKey, setTagValue,
-      setEncryptBucketName, setCorsBucketName, setCorsOrigins, setCorsHeaders,
-      setCorsExposeHeaders, setCorsMaxAge, setBlockBucketName, setView: navigate,
-      createBucket, copyBucket, openBucket, deleteBucket, updateBucket, setVersioning,
-      onFiles, addFile, openObject, downloadFile, deleteObject, saveBucketCors,
-      removeBucketCors, toggleCorsMethod, toggleBlockFlag, toggleBlockAll,
-      saveBlockAccess, removeBlockAccess, addBucketTag, removeBucketTag,
-      enableBucketEncryption, removeBucketEncryption,
+      setCreateName,
+      setCreateRegion,
+      setEditName,
+      setEditRegion,
+      setEditNote,
+      setCopySource,
+      setCopyTarget,
+      setDrag,
+      setTagBucket,
+      setTagKey,
+      setTagValue,
+      setEncryptBucketName,
+      setCorsBucketName,
+      setCorsOrigins,
+      setCorsHeaders,
+      setCorsExposeHeaders,
+      setCorsMaxAge,
+      setBlockBucketName,
+      setView: navigate,
+      createBucket,
+      copyBucket,
+      openBucket,
+      deleteBucket,
+      updateBucket,
+      setVersioning,
+      onFiles,
+      addFile,
+      openObject,
+      downloadFile,
+      deleteObject,
+      saveBucketCors,
+      removeBucketCors,
+      toggleCorsMethod,
+      toggleBlockFlag,
+      toggleBlockAll,
+      saveBlockAccess,
+      removeBlockAccess,
+      addBucketTag,
+      removeBucketTag,
+      enableBucketEncryption,
+      removeBucketEncryption,
+      setNotificationBucketName,
+      setNotificationConfig,
+      loadBucketNotification,
+      saveBucketNotification,
+      configureBucketNotification,
+      removeBucketNotification,
     },
     blockFlags: BLOCK_FLAGS,
   };

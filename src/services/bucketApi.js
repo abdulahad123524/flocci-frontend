@@ -168,7 +168,6 @@ export const uploadMultipartObject = async (payload) => {
   return readResponse(response, "Multipart upload failed");
 };
 
-
 export const downloadObject = async (bucketName, key) => {
   const response = await fetch(
     `/api/download-file?key=${encodeURIComponent(key)}&bucketName=${encodeURIComponent(bucketName)}`,
@@ -196,4 +195,42 @@ export const deleteBucket = async (bucketName) => {
     body: JSON.stringify({ bucketName }),
   });
   return readResponse(response, "Could not delete bucket");
+};
+
+export const getBucketNotification = async (bucketName) => {
+  const response = await fetch(
+    `/api/bucketnotification?bucketName=${encodeURIComponent(bucketName)}`,
+  );
+  const data = await readResponse(response, "Could not load notification");
+  return data.result || {};
+};
+
+export const updateBucketNotification = async (payload) => {
+  const response = await fetch("/api/bucketnotification", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await readResponse(response, "Could not save notification");
+  return data.result || {};
+};
+
+export const deleteBucketNotification = async (bucketName) => {
+  const response = await fetch("/api/bucketnotification", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bucketName }),
+  });
+  const data = await readResponse(response, "Could not remove notification");
+  return data.result || {};
+};
+
+export const configureBucketNotification = async (payload) => {
+  const response = await fetch("/api/bucketnotification/configure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await readResponse(response, "Could not configure notification");
+  return data.result || {};
 };

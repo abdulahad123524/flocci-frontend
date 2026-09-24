@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
   { id: "encrypt", label: "Encrypt", index: "03", kicker: "Cipher lock", title: "ENCRYPT" },
   { id: "cors", label: "CORS", index: "04", kicker: "Origin gate", title: "CORS" },
   { id: "block", label: "Block", index: "05", kicker: "Public gate", title: "BLOCK" },
+  { id: "notification", label: "Notification", index: "08", kicker: "Alert hub", title: "NOTIFICATION" },
   { id: "storage", label: "Storage", index: "06", kicker: "Object store", title: "STORAGE" },
   { id: "backup", label: "Backup", index: "07", kicker: "Snapshot dock", title: "BACKUP" },
 ];

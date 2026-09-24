@@ -3,6 +3,7 @@ import ObjectPreview from "../components/ObjectPreview";
 import ObjectRow from "../components/ObjectRow";
 import PanelHeader from "../components/PanelHeader";
 import { formatBytes } from "../utils/file";
+import NotificationScreen from "./NotificationScreen";
 
 export default function BucketScreen({ state, actions }) {
   const {
