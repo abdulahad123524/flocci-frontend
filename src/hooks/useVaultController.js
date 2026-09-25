@@ -121,6 +121,9 @@ export default function useVaultController() {
 
   const [notificationBucketName, setNotificationBucketName] = useState("");
   const [notificationConfig, setNotificationConfig] = useState("");
+  const [lambdaFunctionArn, setLambdaFunctionArn] = useState("");
+  const [lambdaEvents, setLambdaEvents] = useState([]);
+  const [lambdaNotificationId, setLambdaNotificationId] = useState("");
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationRules, setNotificationRules] = useState([]);
 
@@ -128,9 +131,15 @@ export default function useVaultController() {
     if (!bucketName) {
       setNotificationRules([]);
       setNotificationConfig("");
+      setLambdaFunctionArn("");
+      setLambdaEvents([]);
+      setLambdaNotificationId("");
       return;
     }
     setError("");
+    setLambdaFunctionArn("");
+    setLambdaEvents([]);
+    setLambdaNotificationId("");
     try {
       const data = await getBucketNotification(bucketName);
       const rules = [
@@ -140,6 +149,10 @@ export default function useVaultController() {
       ];
       setNotificationRules(rules);
       setNotificationConfig(JSON.stringify(data, null, 2));
+      const lambdaRule = data.LambdaFunctionConfigurations?.[0];
+      setLambdaFunctionArn(lambdaRule?.LambdaFunctionArn || "");
+      setLambdaEvents(lambdaRule?.Events || []);
+      setLambdaNotificationId(lambdaRule?.Id || "");
       setStatus(
         rules.length
           ? `Loaded ${rules.length} notification rule(s) for ${bucketName}`
@@ -148,6 +161,9 @@ export default function useVaultController() {
     } catch (err) {
       setNotificationRules([]);
       setNotificationConfig("");
+      setLambdaFunctionArn("");
+      setLambdaEvents([]);
+      setLambdaNotificationId("");
       setError(err.message);
     }
   };
@@ -171,7 +187,9 @@ export default function useVaultController() {
     await runAction(async () => {
       const data = await configureBucketNotificationRequest({
         bucketName: notificationBucketName,
-        notificationConfig: JSON.parse(notificationConfig),
+        lambdaFunctionArn,
+        events: lambdaEvents,
+        ...(lambdaNotificationId && { notificationId: lambdaNotificationId }),
       });
       setNotificationRules(data.rules || []);
       setStatus(`Notification configured on ${notificationBucketName}`);
@@ -772,6 +790,9 @@ export default function useVaultController() {
       blockBusy,
       notificationBucketName,
       notificationConfig,
+      lambdaFunctionArn,
+      lambdaEvents,
+      lambdaNotificationId,
       notificationBusy,
       notificationRules,
     },
@@ -819,6 +840,9 @@ export default function useVaultController() {
       removeBucketEncryption,
       setNotificationBucketName,
       setNotificationConfig,
+      setLambdaFunctionArn,
+      setLambdaEvents,
+      setLambdaNotificationId,
       loadBucketNotification,
       saveBucketNotification,
       configureBucketNotification,

@@ -3,12 +3,18 @@ export default function NotificationScreen({ state, actions }) {
     buckets,
     notificationBucketName,
     notificationConfig,
+    lambdaFunctionArn,
+    lambdaEvents,
+    lambdaNotificationId,
     notificationBusy,
     notificationRules,
   } = state;
   const {
     setNotificationBucketName,
     setNotificationConfig,
+    setLambdaFunctionArn,
+    setLambdaEvents,
+    setLambdaNotificationId,
     loadBucketNotification,
     saveBucketNotification,
     configureBucketNotification,
@@ -45,6 +51,36 @@ export default function NotificationScreen({ state, actions }) {
               </select>
             </label>
             <label>
+              Lambda function ARN
+              <input
+                value={lambdaFunctionArn}
+                onChange={(e) => setLambdaFunctionArn(e.target.value)}
+                placeholder="arn:aws:lambda:region:account:function:name"
+              />
+            </label>
+            <label>
+              Lambda events
+              <textarea
+                value={lambdaEvents.join("\n")}
+                onChange={(e) =>
+                  setLambdaEvents(
+                    e.target.value
+                      .split("\n")
+                      .map((event) => event.trim())
+                      .filter(Boolean),
+                  )
+                }
+                rows={3}
+              />
+            </label>
+            <label>
+              Notification ID
+              <input
+                value={lambdaNotificationId}
+                onChange={(e) => setLambdaNotificationId(e.target.value)}
+              />
+            </label>
+            <label>
               Notification configuration
               <textarea
                 value={notificationConfig}
@@ -65,7 +101,12 @@ export default function NotificationScreen({ state, actions }) {
             <button
               className="primary"
               type="button"
-              disabled={notificationBusy || !notificationBucketName}
+              disabled={
+                notificationBusy ||
+                !notificationBucketName ||
+                !lambdaFunctionArn ||
+                !lambdaEvents.length
+              }
               onClick={configureBucketNotification}
             >
               Configure Notification
