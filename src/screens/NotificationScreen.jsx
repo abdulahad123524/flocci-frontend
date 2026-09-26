@@ -26,7 +26,9 @@ export default function NotificationScreen({ state, actions }) {
       <section className="panel bays">
         <header>
           <h2>SET NOTIFICATION</h2>
-          <span className="count">PUT /bucket-notification</span>
+          <span className="count">
+            PUT /api/bucketnotification · POST /api/bucketnotification/configure
+          </span>
         </header>
         {buckets.length === 0 ? (
           <p className="empty">Stamp a bay before you set notification.</p>
@@ -125,7 +127,7 @@ export default function NotificationScreen({ state, actions }) {
       <section className="panel snaps">
         <header>
           <h2>RULES</h2>
-          <span className="count">GET /bucket-notification</span>
+          <span className="count">GET /api/bucketnotification</span>
         </header>
         {!notificationBucketName ? (
           <p className="empty">Pick a bay to load notification.</p>
