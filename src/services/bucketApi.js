@@ -234,3 +234,15 @@ export const configureBucketNotification = async (payload) => {
   const data = await readResponse(response, "Could not configure notification");
   return data.result || {};
 };
+
+export const configureAllBucketsForSqs = async () => {
+  const response = await fetch("/api/buckets/sqs-notification", {
+    method: "POST",
+  });
+  return readResponse(response, "Could not configure SQS for buckets");
+};
+
+export const getSqsMessages = async () => {
+  const response = await fetch("/api/sqs-messages");
+  return readResponse(response, "Could not load SQS messages");
+};

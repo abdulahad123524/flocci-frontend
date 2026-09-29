@@ -6,6 +6,9 @@ export default function NotificationScreen({ state, actions }) {
     lambdaFunctionArn,
     lambdaEvents,
     lambdaNotificationId,
+    queueArn,
+    sqsMessages,
+    sqsSetupResults,
     notificationBusy,
     notificationRules,
   } = state;
@@ -18,6 +21,8 @@ export default function NotificationScreen({ state, actions }) {
     loadBucketNotification,
     saveBucketNotification,
     configureBucketNotification,
+    enableSqsObjectNotifications,
+    loadSqsMessages,
     removeBucketNotification,
   } = actions;
 
@@ -113,6 +118,23 @@ export default function NotificationScreen({ state, actions }) {
             >
               Configure Notification
             </button>
+            <h3 className="subhead">SQS OBJECT UPLOAD</h3>
+            <button
+              className="primary"
+              type="button"
+              disabled={notificationBusy || buckets.length === 0}
+              onClick={enableSqsObjectNotifications}
+            >
+              Enable SQS for All Existing Buckets
+            </button>
+            <label>
+              Shared SQS queue ARN
+              <input
+                value={queueArn}
+                readOnly
+                placeholder="Enable object upload events to create the queue"
+              />
+            </label>
             <button
               className="ghost"
               type="button"
@@ -126,8 +148,8 @@ export default function NotificationScreen({ state, actions }) {
       </section>
       <section className="panel snaps">
         <header>
-          <h2>RULES</h2>
-          <span className="count">GET /api/bucketnotification</span>
+          <h2>RULES & MESSAGES</h2>
+          <span className="count">GET /api/bucketnotification · GET /api/sqs-messages</span>
         </header>
         {!notificationBucketName ? (
           <p className="empty">Pick a bay to load notification.</p>
@@ -141,6 +163,45 @@ export default function NotificationScreen({ state, actions }) {
             </div>
           ))
         )}
+        {sqsSetupResults.length > 0 && (
+          <div className="notification-results">
+            {sqsSetupResults.map((result) => (
+              <div key={result.bucketName} className="notification-rule">
+                <strong>
+                  {result.bucketName}: {result.success ? "configured" : "failed"}
+                </strong>
+                {result.error && <p>{result.error}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="notification-messages">
+          <div className="subhead">
+            <h3>SQS MESSAGES</h3>
+            <button
+              className="ghost"
+              type="button"
+              disabled={notificationBusy || !queueArn}
+              onClick={loadSqsMessages}
+            >
+              Check Queue
+            </button>
+          </div>
+          {sqsMessages.length === 0 ? (
+            <p className="empty">
+              {queueArn
+                ? "Waiting for object-created messages..."
+                : "Create or select a queue to view its messages."}
+            </p>
+          ) : (
+            sqsMessages.map((message) => (
+              <div key={message.messageId} className="notification-rule">
+                <strong>{message.messageId}</strong>
+                <pre>{message.body}</pre>
+              </div>
+            ))
+          )}
+        </div>
       </section>
     </div>
   );

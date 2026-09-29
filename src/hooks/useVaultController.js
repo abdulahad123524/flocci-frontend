@@ -3,6 +3,7 @@ import { getObject } from "../services/objectApi";
 import {
   copyBucket as copyBucketRequest,
   configureBucketNotification as configureBucketNotificationRequest,
+  configureAllBucketsForSqs,
   createBucket as createBucketRequest,
   deleteBucket as deleteBucketRequest,
   deleteBucketBlockAccess,
@@ -15,6 +16,7 @@ import {
   getBucketCors,
   getBucketEncryption,
   getBucketNotification,
+  getSqsMessages,
   getBucketTags,
   getBucketVersioning,
   listBuckets,
@@ -138,6 +140,9 @@ export default function useVaultController() {
   const [lambdaFunctionArn, setLambdaFunctionArn] = useState("");
   const [lambdaEvents, setLambdaEvents] = useState([]);
   const [lambdaNotificationId, setLambdaNotificationId] = useState("");
+  const [queueArn, setQueueArn] = useState("");
+  const [sqsMessages, setSqsMessages] = useState([]);
+  const [sqsSetupResults, setSqsSetupResults] = useState([]);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationRules, setNotificationRules] = useState([]);
 
@@ -148,12 +153,16 @@ export default function useVaultController() {
       setLambdaFunctionArn("");
       setLambdaEvents([]);
       setLambdaNotificationId("");
+      setQueueArn("");
+      setSqsMessages([]);
       return;
     }
     setError("");
     setLambdaFunctionArn("");
     setLambdaEvents([]);
     setLambdaNotificationId("");
+    setQueueArn("");
+    setSqsMessages([]);
     try {
       const data = await getBucketNotification(bucketName);
       const config = {
@@ -169,6 +178,10 @@ export default function useVaultController() {
       setLambdaFunctionArn(lambdaRule?.LambdaFunctionArn || "");
       setLambdaEvents(lambdaRule?.Events || []);
       setLambdaNotificationId(lambdaRule?.Id || "");
+      const queueRule = data.QueueConfigurations?.find(
+        (rule) => rule.Id === "floci-s3-object-events",
+      );
+      setQueueArn(queueRule?.QueueArn || "");
       setStatus(
         rules.length
           ? `Loaded ${rules.length} notification rule(s) for ${bucketName}`
@@ -203,19 +216,65 @@ export default function useVaultController() {
     event.preventDefault();
     if (!notificationBucketName) return setError("Pick a bucket first");
     await runAction(async () => {
-      const data = await configureBucketNotificationRequest({
+      await configureBucketNotificationRequest({
         bucketName: notificationBucketName,
         lambdaFunctionArn,
         events: lambdaEvents,
         ...(lambdaNotificationId && { notificationId: lambdaNotificationId }),
       });
+      const data = await getBucketNotification(notificationBucketName);
       const config = {
         ...EMPTY_NOTIFICATION_CONFIG,
-        LambdaFunctionConfigurations: data.rules || [],
+        LambdaFunctionConfigurations: data.LambdaFunctionConfigurations || [],
+        QueueConfigurations: data.QueueConfigurations || [],
+        TopicConfigurations: data.TopicConfigurations || [],
       };
       setNotificationRules(getNotificationRules(config));
       setNotificationConfig(JSON.stringify(config, null, 2));
+      const queueRule = config.QueueConfigurations.find(
+        (rule) => rule.Id === "floci-s3-object-events",
+      );
+      setQueueArn(queueRule?.QueueArn || "");
       setStatus(`Notification configured on ${notificationBucketName}`);
+    }, setNotificationBusy);
+  };
+
+  const enableSqsObjectNotifications = async () => {
+    await runAction(async () => {
+      const data = await configureAllBucketsForSqs();
+      const results = data.results || [];
+      const configuredCount = results.filter((result) => result.success).length;
+      setSqsSetupResults(results);
+
+      if (notificationBucketName) {
+        const configData = await getBucketNotification(notificationBucketName);
+        const config = {
+          ...EMPTY_NOTIFICATION_CONFIG,
+          LambdaFunctionConfigurations:
+            configData.LambdaFunctionConfigurations || [],
+          QueueConfigurations: configData.QueueConfigurations || [],
+          TopicConfigurations: configData.TopicConfigurations || [],
+        };
+        setNotificationRules(getNotificationRules(config));
+        setNotificationConfig(JSON.stringify(config, null, 2));
+        const queueRule = config.QueueConfigurations.find(
+          (rule) => rule.Id === "floci-s3-object-events",
+        );
+        setQueueArn(queueRule?.QueueArn || "");
+      }
+
+      setStatus(
+        `SQS configured for ${configuredCount} of ${results.length} existing bucket(s)`,
+      );
+    }, setNotificationBusy);
+  };
+
+  const loadSqsMessages = async () => {
+    if (!queueArn) return setError("Enable object upload notifications first");
+    await runAction(async () => {
+      const data = await getSqsMessages();
+      setSqsMessages(data.messages || []);
+      setStatus(`Loaded ${data.messages?.length || 0} SQS message(s)`);
     }, setNotificationBusy);
   };
 
@@ -391,6 +450,29 @@ export default function useVaultController() {
     }
     loadBucketNotification(notificationBucketName);
   }, [view, notificationBucketName]);
+
+  useEffect(() => {
+    if (view !== "notification" || !queueArn) return;
+
+    let cancelled = false;
+    let timeoutId;
+    const pollMessages = async () => {
+      try {
+        const data = await getSqsMessages(queueArn);
+        if (!cancelled) setSqsMessages(data.messages || []);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+
+      if (!cancelled) timeoutId = window.setTimeout(pollMessages, 3000);
+    };
+
+    pollMessages();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [view, queueArn]);
 
   const runAction = async (action, busySetter) => {
     setError("");
@@ -817,6 +899,9 @@ export default function useVaultController() {
       lambdaFunctionArn,
       lambdaEvents,
       lambdaNotificationId,
+      queueArn,
+      sqsMessages,
+      sqsSetupResults,
       notificationBusy,
       notificationRules,
     },
@@ -870,6 +955,8 @@ export default function useVaultController() {
       loadBucketNotification,
       saveBucketNotification,
       configureBucketNotification,
+      enableSqsObjectNotifications,
+      loadSqsMessages,
       removeBucketNotification,
     },
     blockFlags: BLOCK_FLAGS,
