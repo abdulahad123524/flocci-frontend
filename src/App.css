@@ -931,3 +931,262 @@ button:disabled {
     min-width: 0;
   }
 }
+
+
+
+
+
+
+
+
+
+
+.notification-messages {
+  min-width: 0;
+}
+
+.sqs-messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sqs-messages-header h3 {
+  margin: 0;
+}
+
+.sqs-messages-header p {
+  margin: 5px 0 0;
+  color: #fff;
+  font-size: 13px;
+}
+
+.sqs-messages-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.sqs-messages-summary > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1a5c4c;
+  font-weight: 600;
+}
+
+.sqs-status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #24a477;
+}
+
+.sqs-messages-list {
+  height: 420px;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 2px 8px 2px 2px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #aabbb4 transparent;
+}
+
+.sqs-messages-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.sqs-messages-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sqs-messages-list::-webkit-scrollbar-thumb {
+  background: #b8c7c0;
+  border-radius: 10px;
+}
+
+.sqs-message-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dfe9e4;
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 2px 8px rgb(22 56 44 / 4%);
+}
+
+.sqs-message-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sqs-message-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sqs-event-badge {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sqs-event-badge.s3-event {
+  color: #176b50;
+  background: #e0f5e9;
+}
+
+.sqs-event-badge.manual-event {
+  color: #5b4bb7;
+  background: #eee9ff;
+}
+
+.sqs-message-id {
+  overflow-wrap: anywhere;
+  color: #596b64;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sqs-receive-count {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: #876018;
+  background: #fff3d8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sqs-message-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid #edf1ee;
+  border-bottom: 1px solid #edf1ee;
+}
+
+.sqs-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sqs-detail-item > span {
+  color: #fff;
+  font-size: 11px;
+}
+
+.sqs-detail-item > strong {
+  overflow-wrap: anywhere;
+  color: #dad7cd;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sqs-message-json {
+  margin-top: 12px;
+  border-radius: 8px;
+  background: #718078;
+}
+
+.sqs-message-json summary {
+  padding: 11px 12px;
+  color: #315d4c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sqs-message-json pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-top: 1px solid #e1e9e4;
+  color: #33483e;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sqs-message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.sqs-empty {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #d5e2db;
+  border-radius: 12px;
+  color: #718078;
+  text-align: center;
+}
+
+.sqs-empty-icon {
+  font-size: 28px;
+}
+
+.sqs-empty strong {
+  color: #294638;
+  font-size: 14px;
+}
+
+.sqs-empty p {
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .sqs-messages-header {
+    align-items: flex-start;
+  }
+
+  .sqs-messages-header .ghost {
+    flex-shrink: 0;
+  }
+
+  .sqs-messages-list {
+    height: 360px;
+    max-height: 360px;
+  }
+
+  .sqs-message-card {
+    padding: 12px;
+  }
+
+  .sqs-message-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

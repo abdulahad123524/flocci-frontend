@@ -246,3 +246,22 @@ export const getSqsMessages = async () => {
   const response = await fetch("/api/sqs-messages");
   return readResponse(response, "Could not load SQS messages");
 };
+
+export const getSpendTime = async () => {
+  const response = await fetch("/api/sqs-SpendTest", {
+    method: "POST",
+  });
+
+  return readResponse(response, "Could not send SQS test message");
+};
+
+export const deleteSqsQueueMessage = async (receipthandle) => {
+  const response = fetch("/api/sqs-deleteMessage", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ receipthandle }),
+  });
+  return readResponse(response, " Could not delete SQS message");
+};

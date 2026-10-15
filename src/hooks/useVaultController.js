@@ -29,6 +29,8 @@ import {
   deleteBucketNotification,
   uploadObject,
   uploadMultipartObject,
+  getSpendTime,
+  deleteSqsQueueMessage,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
@@ -269,12 +271,41 @@ export default function useVaultController() {
     }, setNotificationBusy);
   };
 
+  const spendSQSTime = async () => {
+    await runAction(async () => {
+      const data = await getSpendTime();
+      setStatus(
+        data?.data?.message || data.message || "SQS send message successfully ",
+      );
+      await loadSqsMessages();
+    }, setNotificationBusy);
+  };
+
   const loadSqsMessages = async () => {
     if (!queueArn) return setError("Enable object upload notifications first");
     await runAction(async () => {
       const data = await getSqsMessages();
       setSqsMessages(data.messages || []);
       setStatus(`Loaded ${data.messages?.length || 0} SQS message(s)`);
+    }, setNotificationBusy);
+  };
+
+  const deleteSqsMessage = async (message) => {
+    if (!message?.receiptHandle) {
+      setError("Message receipt handle is missing");
+      return;
+    }
+
+    await runAction(async () => {
+      await deleteSqsQueueMessage(message.receiptHandle);
+
+      setSqsMessages((previousMessages) =>
+        previousMessages.filter(
+          (item) => item.receiptHandle !== message.receiptHandle,
+        ),
+      );
+
+      setStatus("SQS message deleted successfully");
     }, setNotificationBusy);
   };
 
@@ -456,18 +487,34 @@ export default function useVaultController() {
 
     let cancelled = false;
     let timeoutId;
-    const pollMessages = async () => {
+    // const pollMessages = async () => {
+    //   try {
+    //     console.log("=========>>> multiple time");
+
+    //     const data = await getSqsMessages(queueArn);
+    //     if (!cancelled) setSqsMessages(data.messages || []);
+    //   } catch (err) {
+    //     if (!cancelled) setError(err.message);
+    //   }
+
+    //   if (!cancelled) timeoutId = window.setTimeout(pollMessages, 3000);
+    // };
+    // pollMessages();
+
+    const loadMessages = async () => {
       try {
         const data = await getSqsMessages(queueArn);
-        if (!cancelled) setSqsMessages(data.messages || []);
+
+        if (!cancelled) {
+          setSqsMessages(data.messages || []);
+        }
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) {
+          setError(err.message);
+        }
       }
-
-      if (!cancelled) timeoutId = window.setTimeout(pollMessages, 3000);
     };
-
-    pollMessages();
+    loadMessages();
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
@@ -958,6 +1005,8 @@ export default function useVaultController() {
       enableSqsObjectNotifications,
       loadSqsMessages,
       removeBucketNotification,
+      spendSQSTime,
+      deleteSqsMessage,
     },
     blockFlags: BLOCK_FLAGS,
   };
