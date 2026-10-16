@@ -1,5 +1,3 @@
-import { deleteSqsQueueMessage } from "../services/bucketApi";
-
 export default function NotificationScreen({ state, actions }) {
   const {
     buckets,
@@ -13,6 +11,11 @@ export default function NotificationScreen({ state, actions }) {
     sqsSetupResults,
     notificationBusy,
     notificationRules,
+    snsError,
+    snsBusy,
+    snsTopicArn,
+    snsTopicName,
+    snsSuccess,
   } = state;
   const {
     setNotificationBucketName,
@@ -27,7 +30,18 @@ export default function NotificationScreen({ state, actions }) {
     loadSqsMessages,
     removeBucketNotification,
     spendSQSTime,
+    deleteSqsMessage,
+    handleCreateSnsTopic,
+    setSnsTopicName,
   } = actions;
+
+  console.log(
+    "=======",
+    snsBusy,
+    "=========",
+
+    !snsTopicName?.trim(),
+  );
 
   return (
     <div className="stage">
@@ -161,6 +175,63 @@ export default function NotificationScreen({ state, actions }) {
           </form>
         )}
       </section>
+      <section className="panel sns-panel">
+        <header>
+          <h2>SNS TOPIC</h2>
+          <span className="count">POST /api/sns/create-topic</span>
+        </header>
+
+        <p className="empty">
+          Create an SNS topic to use as a destination for S3 notifications.
+        </p>
+        <form className="form" onSubmit={handleCreateSnsTopic}>
+          <label>
+            Topic Name
+            <input
+              value={snsTopicName}
+              onChange={(event) => {
+                setSnsTopicName(event.target.value);
+              }}
+              placeholder="floci-notifications"
+              maxLength={256}
+              required
+            />
+          </label>
+
+          <button
+            className="primary"
+            type="submit"
+            disabled={snsBusy || !snsTopicName?.trim()}
+          >
+            {snsBusy ? "Creating..." : "Create SNS Topic"}
+          </button>
+        </form>
+
+        {snsError && <p className="error">{snsError}</p>}
+
+        {snsSuccess && (
+          <div className="notification-rule">
+            <strong>{snsSuccess}</strong>
+            <p>Topic: {snsTopicName?.trim()}</p>
+            <label>
+              Topic ARN
+              <input value={snsTopicArn} readOnly />
+            </label>
+            <button
+              className="ghost"
+              type="button"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(snsTopicArn)
+                  .catch((error) => console.error("Copy failed:", error));
+              }}
+            >
+              Copy Topic ARN
+            </button>
+          </div>
+        )}
+      </section>
+
       <section className="panel snaps">
         <header>
           <h2>RULES & MESSAGES</h2>
@@ -377,7 +448,7 @@ export default function NotificationScreen({ state, actions }) {
                           className="danger"
                           type="button"
                           disabled={notificationBusy || !message.receiptHandle}
-                          onClick={() => deleteSqsQueueMessage(message)}
+                          onClick={() => deleteSqsMessage(message)}
                         >
                           Delete
                         </button>

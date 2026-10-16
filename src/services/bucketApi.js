@@ -256,7 +256,7 @@ export const getSpendTime = async () => {
 };
 
 export const deleteSqsQueueMessage = async (receipthandle) => {
-  const response = fetch("/api/sqs-deleteMessage", {
+  const response = await fetch("/api/sqs-deleteMessage", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -264,4 +264,16 @@ export const deleteSqsQueueMessage = async (receipthandle) => {
     body: JSON.stringify({ receipthandle }),
   });
   return readResponse(response, " Could not delete SQS message");
+};
+
+export const createSnsTopic = async (topicName) => {
+  const response = await fetch("/api/sns/create-topic", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ topicName }),
+  });
+
+  return readResponse(response, "Could not create SNS topic");
 };

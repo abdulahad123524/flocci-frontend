@@ -1190,3 +1190,66 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.sns-topic-panel {
+  margin-top: 20px;
+}
+
+.sns-topic-panel .sns-topic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sns-topic-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-color, inherit);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sns-topic-panel input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: var(--input-bg, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.sns-topic-panel input:focus {
+  outline: 2px solid #1a5c4c;
+  outline-offset: 1px;
+}
+
+.sns-topic-panel .primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sns-topic-error {
+  margin-top: 12px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.sns-topic-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #b7d9c9;
+  border-radius: 8px;
+  background: #f0f9f4;
+}
+
+.sns-topic-result code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}

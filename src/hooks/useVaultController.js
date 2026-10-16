@@ -31,6 +31,7 @@ import {
   uploadMultipartObject,
   getSpendTime,
   deleteSqsQueueMessage,
+  createSnsTopic,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
@@ -147,7 +148,11 @@ export default function useVaultController() {
   const [sqsSetupResults, setSqsSetupResults] = useState([]);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationRules, setNotificationRules] = useState([]);
-
+  const [snsTopicName, setSnsTopicName] = useState("floci-notifications");
+  const [snsTopicArn, setSnsTopicArn] = useState("");
+  const [snsBusy, setSnsBusy] = useState(false);
+  const [snsError, setSnsError] = useState("");
+  const [snsSuccess, setSnsSuccess] = useState("");
   const loadBucketNotification = async (bucketName) => {
     if (!bucketName) {
       setNotificationRules([]);
@@ -890,6 +895,35 @@ export default function useVaultController() {
     }
   };
 
+  const handleCreateSnsTopic = async (event) => {
+    event.preventDefault();
+
+    const topicName = snsTopicName.trim();
+
+    if (!topicName) return;
+
+    setSnsBusy(true);
+    setSnsError("");
+    setSnsSuccess("");
+
+    try {
+      const response = await createSnsTopic(topicName);
+
+      console.log("SNS API response:", response);
+
+      const result = response?.data;
+
+      setSnsTopicName(result?.topicName || topicName);
+      setSnsTopicArn(result?.topicArn || "");
+      setSnsSuccess(response?.message || "SNS topic created successfully");
+    } catch (error) {
+      console.error("SNS API error:", error);
+      setSnsError(error.message || "Failed to create SNS topic");
+    } finally {
+      setSnsBusy(false);
+    }
+  };
+
   const navigate = (nextView) => {
     setView(nextView);
     const bucketName = active?.name || buckets[0]?.name || "";
@@ -951,6 +985,11 @@ export default function useVaultController() {
       sqsSetupResults,
       notificationBusy,
       notificationRules,
+      snsTopicName,
+      snsTopicArn,
+      snsBusy,
+      snsError,
+      snsSuccess,
     },
     actions: {
       setCreateName,
@@ -1007,6 +1046,8 @@ export default function useVaultController() {
       removeBucketNotification,
       spendSQSTime,
       deleteSqsMessage,
+      handleCreateSnsTopic,
+      setSnsTopicName,
     },
     blockFlags: BLOCK_FLAGS,
   };
