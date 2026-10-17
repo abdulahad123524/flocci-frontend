@@ -32,6 +32,7 @@ import {
   getSpendTime,
   deleteSqsQueueMessage,
   createSnsTopic,
+  createSnsSubcribe,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
@@ -153,6 +154,8 @@ export default function useVaultController() {
   const [snsBusy, setSnsBusy] = useState(false);
   const [snsError, setSnsError] = useState("");
   const [snsSuccess, setSnsSuccess] = useState("");
+  const [snsProtocol, setSnsProtocol] = useState("");
+  const [snsEndpoint, setSnsEndPoint] = useState("");
   const loadBucketNotification = async (bucketName) => {
     if (!bucketName) {
       setNotificationRules([]);
@@ -924,6 +927,26 @@ export default function useVaultController() {
     }
   };
 
+  const handleSnsSubcribe = async (event) => {
+    event.preventDefault();
+    try {
+      if (!snsTopicArn.trim() || !snsProtocol.trim() || !snsEndpoint.trim()) {
+        setError("filled are required filled");
+      }
+      const response = await createSnsSubcribe({
+        topicArn: snsTopicArn.trim(),
+        protocol: snsProtocol,
+        endpoint: snsEndpoint.trim(),
+      });
+
+      setSnsSuccess(
+        response.message || "request submittion successfully submitted ",
+      );
+    } catch (error) {
+      setSnsError(error.message, "could not subcribe Sns Topic ");
+    }
+  };
+
   const navigate = (nextView) => {
     setView(nextView);
     const bucketName = active?.name || buckets[0]?.name || "";
@@ -990,6 +1013,8 @@ export default function useVaultController() {
       snsBusy,
       snsError,
       snsSuccess,
+      snsEndpoint,
+      snsProtocol,
     },
     actions: {
       setCreateName,
@@ -1048,6 +1073,9 @@ export default function useVaultController() {
       deleteSqsMessage,
       handleCreateSnsTopic,
       setSnsTopicName,
+      handleSnsSubcribe,
+      setSnsEndPoint,
+      setSnsProtocol,
     },
     blockFlags: BLOCK_FLAGS,
   };

@@ -16,6 +16,8 @@ export default function NotificationScreen({ state, actions }) {
     snsTopicArn,
     snsTopicName,
     snsSuccess,
+    snsEndpoint,
+    snsProtocol,
   } = state;
   const {
     setNotificationBucketName,
@@ -33,6 +35,9 @@ export default function NotificationScreen({ state, actions }) {
     deleteSqsMessage,
     handleCreateSnsTopic,
     setSnsTopicName,
+    setSnsEndPoint,
+    setSnsProtocol,
+    handleSnsSubcribe,
   } = actions;
 
   console.log(
@@ -230,6 +235,55 @@ export default function NotificationScreen({ state, actions }) {
             </button>
           </div>
         )}
+
+        <form className="form" onSubmit={handleSnsSubcribe}>
+          <h3 className="subhead">SNS SUBSCRIPTION</h3>
+
+          <label>
+            Topic ARN
+            <input
+              value={snsTopicName}
+              readOnly
+              placeholder="Create an SNS topic first"
+            />
+          </label>
+
+          <label>
+            Protocol
+            <select
+              value={snsProtocol}
+              onChange={(event) => setSnsProtocol(event.target.value)}
+            >
+              <option value="sqs">SQS Queue</option>
+              <option value="email">Email</option>
+              <option value="https">HTTPS Endpoint</option>
+            </select>
+          </label>
+
+          <label>
+            Subscriber Endpoint
+            <input
+              value={snsEndpoint}
+              onChange={(event) => setSnsEndPoint(event.target.value)}
+              placeholder={
+                snsProtocol === "sqs"
+                  ? "SQS queue ARN"
+                  : snsProtocol === "email"
+                    ? "your@email.com"
+                    : "https://your-endpoint.example.com"
+              }
+              required
+            />
+          </label>
+
+          <button
+            className="primary"
+            type="submit"
+            disabled={snsBusy || !snsTopicName || !snsEndpoint.trim()}
+          >
+            {snsBusy ? "Subscribing..." : "Subscribe to Topic"}
+          </button>
+        </form>
       </section>
 
       <section className="panel snaps">

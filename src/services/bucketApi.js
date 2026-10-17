@@ -277,3 +277,18 @@ export const createSnsTopic = async (topicName) => {
 
   return readResponse(response, "Could not create SNS topic");
 };
+
+export const createSnsSubcribe = async ({ topicArn, protocol, endpoint }) => {
+  const response = await fetch("/api/sns/sns-subscribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      topicArn,
+      protocol,
+      endpoint,
+    }),
+  });
+  return readResponse(response, "Could not subcribe to SNS ropic");
+};
