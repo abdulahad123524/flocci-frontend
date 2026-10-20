@@ -292,3 +292,20 @@ export const createSnsSubcribe = async ({ topicArn, protocol, endpoint }) => {
   });
   return readResponse(response, "Could not subcribe to SNS ropic");
 };
+
+export const thumbnailReview = async (key, bucketName) => {
+  const params = new URLSearchParams({
+    key,
+    bucketName,
+  });
+
+  const response = await fetch(`/api/objects/thumbnail?${params.toString()}`);
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || "Thumbnail fetch failed");
+  }
+
+  return result;
+};

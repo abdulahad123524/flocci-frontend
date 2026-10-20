@@ -1,11 +1,12 @@
+import { useState } from "react";
 import BucketRow from "../components/BucketRow";
 import ObjectPreview from "../components/ObjectPreview";
 import ObjectRow from "../components/ObjectRow";
 import PanelHeader from "../components/PanelHeader";
 import { formatBytes } from "../utils/file";
-import NotificationScreen from "./NotificationScreen";
 
 export default function BucketScreen({ state, actions }) {
+  const [thumbnailError, setThumbnailError] = useState(null);
   const {
     inputRef,
     buckets,
@@ -23,6 +24,9 @@ export default function BucketScreen({ state, actions }) {
     copySource,
     copyTarget,
     versionBusy,
+    thumbnailUrl,
+    thumbnailLoading,
+    thumbnailKey,
   } = state;
   const {
     createBucket,
@@ -44,6 +48,10 @@ export default function BucketScreen({ state, actions }) {
     openObject,
     downloadFile,
     deleteObject,
+    setThumbnailLoading,
+    setThumbnailKey,
+    setThumbnailUrl,
+    handleThumbnailPreview,
   } = actions;
 
   return (
@@ -281,23 +289,130 @@ export default function BucketScreen({ state, actions }) {
       <section className="panel manifest">
         <PanelHeader
           title="CARGO"
-          count={active ? `${active.files.length} in ${active.name}` : "0 objects"}
+          count={
+            active ? `${active.files.length} in ${active.name}` : "0 objects"
+          }
         />
         {!active ? (
           <p className="empty">Pick a bay to see its files.</p>
         ) : active.files.length === 0 ? (
           <p className="empty">This bay is empty.</p>
         ) : (
-          active.files.map((obj) => (
-            <ObjectRow
-              key={obj.key}
-              object={{ ...obj, sizeLabel: formatBytes(obj.size) }}
-              selected={preview?.key === obj.key}
-              onOpen={() => openObject(obj, active.name)}
-              onDownload={() => downloadFile(active.name, obj.key)}
-              onDelete={() => deleteObject(active.name, obj.key)}
-            />
-          ))
+          active.files.map((obj) => {
+            const isImageFile =
+              /\.(jpe?g|png|webp)$/i.test(obj.key) &&
+              !obj.key.startsWith("thumbnails/");
+
+            return (
+              // <div className="cargo-item" key={obj.key}>
+              //   <ObjectRow
+              //     key={obj.key}
+              //     object={{ ...obj, sizeLabel: formatBytes(obj.size) }}
+              //     selected={preview?.key === obj.key}
+              //     onOpen={() => openObject(obj, active.name)}
+              //     onDownload={() => downloadFile(active.name, obj.key)}
+              //     onDelete={() => deleteObject(active.name, obj.key)}
+              //   />
+              //   {thumbnailKey === obj.key && thumbnailUrl && (
+              //     <div className="thumbnail-preview">
+              //       <img
+              //         src={thumbnailUrl}
+              //         alt="Thumbnail preview"
+              //         style={{
+              //           maxWidth: 300,
+              //           maxHeight: 300,
+              //           objectFit: "contain",
+              //         }}
+              //       />
+              //     </div>
+              //   )}
+              //   {isImageFile && (
+              //     <button
+              //       type="button"
+              //       className="secondary"
+              //       onClick={() => thumbnailReview(obj, active.name)}
+              //     >
+              //       Preview thumbnail
+              //     </button>
+              //   )}
+              // </div>
+
+              <div className="cargo-item" key={obj.key}>
+                <ObjectRow
+                  object={{ ...obj, sizeLabel: formatBytes(obj.size) }}
+                  selected={preview?.key === obj.key}
+                  onOpen={() => openObject(obj, active.name)}
+                  onDownload={() => downloadFile(active.name, obj.key)}
+                  onDelete={() => deleteObject(active.name, obj.key)}
+                />
+
+                {thumbnailKey === obj.key && thumbnailUrl && (
+                  <div className="thumbnail-preview">
+                    <img
+                      src={thumbnailUrl}
+                      alt="Thumbnail preview"
+                      style={{
+                        maxWidth: 300,
+                        maxHeight: 300,
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {isImageFile && (
+                  <>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={thumbnailLoading}
+                      onClick={async () => {
+                        if (thumbnailKey === obj.key && thumbnailUrl) {
+                          setThumbnailUrl(null);
+                          setThumbnailKey(null);
+                          setThumbnailError(null);
+                          return;
+                        }
+
+                        setThumbnailKey(obj.key);
+                        setThumbnailUrl(null);
+                        setThumbnailError(null);
+                        setThumbnailLoading(true);
+
+                        try {
+                          const url = await handleThumbnailPreview(
+                            obj,
+                            active.name,
+                          );
+                          setThumbnailUrl(url);
+                        } catch (error) {
+                          console.error("Thumbnail preview failed:", error);
+                          setThumbnailError({
+                            key: obj.key,
+                            message:
+                              error.message || "Thumbnail preview failed",
+                          });
+                        } finally {
+                          setThumbnailLoading(false);
+                        }
+                      }}
+                    >
+                      {thumbnailLoading && thumbnailKey === obj.key
+                        ? "Loading thumbnail..."
+                        : thumbnailKey === obj.key && thumbnailUrl
+                          ? "Hide thumbnail"
+                          : "Preview thumbnail"}
+                    </button>
+                    {thumbnailError?.key === obj.key && (
+                      <p className="status err" role="alert">
+                        {thumbnailError.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })
         )}
       </section>
 

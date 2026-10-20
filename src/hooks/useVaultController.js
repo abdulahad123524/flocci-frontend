@@ -33,6 +33,7 @@ import {
   deleteSqsQueueMessage,
   createSnsTopic,
   createSnsSubcribe,
+  thumbnailReview,
 } from "../services/bucketApi";
 import { readFileAsBase64, readFilePreview } from "../utils/file";
 
@@ -156,6 +157,9 @@ export default function useVaultController() {
   const [snsSuccess, setSnsSuccess] = useState("");
   const [snsProtocol, setSnsProtocol] = useState("");
   const [snsEndpoint, setSnsEndPoint] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
+  const [thumbnailKey, setThumbnailKey] = useState(null);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
   const loadBucketNotification = async (bucketName) => {
     if (!bucketName) {
       setNotificationRules([]);
@@ -947,6 +951,21 @@ export default function useVaultController() {
     }
   };
 
+  const handleThumbnailPreview = async (obj, bucketName) => {
+    try {
+      const result = await thumbnailReview(obj.key, bucketName);
+
+      if (!result?.imageUrl) {
+        throw new Error("Thumbnail URL API se receive nahi hua.");
+      }
+
+      return result.imageUrl;
+    } catch (error) {
+      console.error("Thumbnail preview failed:", error);
+      throw error;
+    }
+  };
+
   const navigate = (nextView) => {
     setView(nextView);
     const bucketName = active?.name || buckets[0]?.name || "";
@@ -1015,6 +1034,9 @@ export default function useVaultController() {
       snsSuccess,
       snsEndpoint,
       snsProtocol,
+      thumbnailLoading,
+      thumbnailKey,
+      thumbnailUrl,
     },
     actions: {
       setCreateName,
@@ -1076,6 +1098,11 @@ export default function useVaultController() {
       handleSnsSubcribe,
       setSnsEndPoint,
       setSnsProtocol,
+      thumbnailReview,
+      setThumbnailLoading,
+      setThumbnailKey,
+      setThumbnailUrl,
+      handleThumbnailPreview,
     },
     blockFlags: BLOCK_FLAGS,
   };
