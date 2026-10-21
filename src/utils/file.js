@@ -27,10 +27,12 @@ export const readFilePreview = (file) =>
 export const readFileAsBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onload = () => {
       try {
         const bytes = new Uint8Array(reader.result);
-        const chunkSize = 0x8000;
+
+        const chunkSize = 0x6000;
         const encodedChunks = [];
 
         for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -49,6 +51,10 @@ export const readFileAsBase64 = (file) =>
         reject(new Error("This file is too large to prepare for upload."));
       }
     };
-    reader.onerror = reject;
+
+    reader.onerror = () => {
+      reject(reader.error || new Error("Could not read the selected file."));
+    };
+
     reader.readAsArrayBuffer(file);
   });
