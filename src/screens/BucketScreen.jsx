@@ -52,6 +52,7 @@ export default function BucketScreen({ state, actions }) {
     setThumbnailKey,
     setThumbnailUrl,
     handleThumbnailPreview,
+    handleObjectVersioning,
   } = actions;
 
   return (
@@ -304,39 +305,6 @@ export default function BucketScreen({ state, actions }) {
               !obj.key.startsWith("thumbnails/");
 
             return (
-              // <div className="cargo-item" key={obj.key}>
-              //   <ObjectRow
-              //     key={obj.key}
-              //     object={{ ...obj, sizeLabel: formatBytes(obj.size) }}
-              //     selected={preview?.key === obj.key}
-              //     onOpen={() => openObject(obj, active.name)}
-              //     onDownload={() => downloadFile(active.name, obj.key)}
-              //     onDelete={() => deleteObject(active.name, obj.key)}
-              //   />
-              //   {thumbnailKey === obj.key && thumbnailUrl && (
-              //     <div className="thumbnail-preview">
-              //       <img
-              //         src={thumbnailUrl}
-              //         alt="Thumbnail preview"
-              //         style={{
-              //           maxWidth: 300,
-              //           maxHeight: 300,
-              //           objectFit: "contain",
-              //         }}
-              //       />
-              //     </div>
-              //   )}
-              //   {isImageFile && (
-              //     <button
-              //       type="button"
-              //       className="secondary"
-              //       onClick={() => thumbnailReview(obj, active.name)}
-              //     >
-              //       Preview thumbnail
-              //     </button>
-              //   )}
-              // </div>
-
               <div className="cargo-item" key={obj.key}>
                 <ObjectRow
                   object={{ ...obj, sizeLabel: formatBytes(obj.size) }}
@@ -345,6 +313,80 @@ export default function BucketScreen({ state, actions }) {
                   onDownload={() => downloadFile(active.name, obj.key)}
                   onDelete={() => deleteObject(active.name, obj.key)}
                 />
+
+                <div className="object-version-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={
+                      versionsLoadingKey === `${active.name}/${obj.key}`
+                    }
+                    onClick={() => handleObjectVersioning(active.name, obj.key)}
+                  >
+                    {versionsLoadingKey === `${active.name}/${obj.key}`
+                      ? "Loading versions..."
+                      : objectVersions[`${active.name}/${obj.key}`]
+                        ? "Hide versions"
+                        : "View versions"}
+                  </button>
+                </div>
+
+                {versionsError?.key === `${active.name}/${obj.key}` && (
+                  <p className="status err" role="alert">
+                    {versionsError.message}
+                  </p>
+                )}
+
+                {objectVersions[`${active.name}/${obj.key}`] && (
+                  <div className="object-version-history">
+                    <h4>Version History</h4>
+
+                    {objectVersions[`${active.name}/${obj.key}`].length ===
+                    0 ? (
+                      <p className="empty">
+                        No versions found for this object.
+                      </p>
+                    ) : (
+                      objectVersions[`${active.name}/${obj.key}`].map(
+                        (version) => (
+                          <div
+                            className="object-version-row"
+                            key={version.versionId}
+                          >
+                            <div>
+                              <strong>
+                                {version.isLatest
+                                  ? "Latest version"
+                                  : "Previous version"}
+                              </strong>
+                              <p>
+                                Version ID: {version.versionId ?? "Unavailable"}
+                              </p>
+                              <p>
+                                Last modified:{" "}
+                                {version.lastModified
+                                  ? new Date(
+                                      version.lastModified,
+                                    ).toLocaleString()
+                                  : "Unavailable"}
+                              </p>
+                            </div>
+
+                            <span
+                              className={
+                                version.isLatest
+                                  ? "version-badge latest"
+                                  : "version-badge"
+                              }
+                            >
+                              {version.isLatest ? "Latest" : "Old"}
+                            </span>
+                          </div>
+                        ),
+                      )
+                    )}
+                  </div>
+                )}
 
                 {thumbnailKey === obj.key && thumbnailUrl && (
                   <div className="thumbnail-preview">

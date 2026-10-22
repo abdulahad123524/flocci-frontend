@@ -9,3 +9,8 @@ export const getObject = async (bucketName, key) => {
   }
   return data;
 };
+export const handleViewVersions = async (bucketName, key) => {
+  const result = await getObjectVersions(bucketName, key);
+  setObjectVersions(result.versions);
+  setShowVersions(true);
+};

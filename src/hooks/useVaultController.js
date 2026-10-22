@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getObject } from "../services/objectApi";
+import { getObject, handleViewVersions } from "../services/objectApi";
 import {
   copyBucket as copyBucketRequest,
   configureBucketNotification as configureBucketNotificationRequest,
@@ -966,6 +966,16 @@ export default function useVaultController() {
     }
   };
 
+  const handleObjectVersioning = async (bucketName, key) => {
+    try {
+      const result = await handleViewVersions(bucketName, key);
+
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const navigate = (nextView) => {
     setView(nextView);
     const bucketName = active?.name || buckets[0]?.name || "";
@@ -1103,6 +1113,7 @@ export default function useVaultController() {
       setThumbnailKey,
       setThumbnailUrl,
       handleThumbnailPreview,
+      handleObjectVersioning,
     },
     blockFlags: BLOCK_FLAGS,
   };
