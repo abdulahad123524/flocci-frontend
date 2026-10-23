@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getObject, handleViewVersions } from "../services/objectApi";
+import { getObject, getObjectVersions } from "../services/objectApi";
 import {
   copyBucket as copyBucketRequest,
   configureBucketNotification as configureBucketNotificationRequest,
@@ -160,6 +160,11 @@ export default function useVaultController() {
   const [thumbnailUrl, setThumbnailUrl] = useState(null);
   const [thumbnailKey, setThumbnailKey] = useState(null);
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
+  const [objectVersions, setObjectVersions] = useState([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versionsError, setVersionsError] = useState(null);
+  const [versionsLoading, setVersionsLoading] = useState(null);
+  const [selectedObject, setSelectedObject] = useState(null);
   const loadBucketNotification = async (bucketName) => {
     if (!bucketName) {
       setNotificationRules([]);
@@ -966,13 +971,21 @@ export default function useVaultController() {
     }
   };
 
-  const handleObjectVersioning = async (bucketName, key) => {
-    try {
-      const result = await handleViewVersions(bucketName, key);
+  const handleViewVersions = async (bucketName, key) => {
+    setVersionsLoading(true);
+    setVersionsError(null);
+    setSelectedObject({ bucketName, key });
+    setShowVersions(true);
 
-      return result;
+    try {
+      const result = await getObjectVersions(bucketName, key);
+
+      setObjectVersions(result.versions ?? []);
     } catch (error) {
-      throw error;
+      setObjectVersions([]);
+      setVersionsError(error.message || "Failed to load object versions");
+    } finally {
+      setVersionsLoading(false);
     }
   };
 
@@ -1047,6 +1060,11 @@ export default function useVaultController() {
       thumbnailLoading,
       thumbnailKey,
       thumbnailUrl,
+      versionsLoading,
+      versionsError,
+      showVersions,
+      objectVersions,
+      selectedObject,
     },
     actions: {
       setCreateName,
@@ -1113,7 +1131,12 @@ export default function useVaultController() {
       setThumbnailKey,
       setThumbnailUrl,
       handleThumbnailPreview,
-      handleObjectVersioning,
+      handleViewVersions,
+      setVersionsLoading,
+      setVersionsError,
+      setShowVersions,
+      setObjectVersions,
+      setSelectedObject,
     },
     blockFlags: BLOCK_FLAGS,
   };

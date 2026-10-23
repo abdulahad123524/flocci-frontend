@@ -27,6 +27,11 @@ export default function BucketScreen({ state, actions }) {
     thumbnailUrl,
     thumbnailLoading,
     thumbnailKey,
+    versionsLoading,
+    versionsError,
+    objectVersions,
+    showVersions,
+    selectedObject,
   } = state;
   const {
     createBucket,
@@ -52,7 +57,8 @@ export default function BucketScreen({ state, actions }) {
     setThumbnailKey,
     setThumbnailUrl,
     handleThumbnailPreview,
-    handleObjectVersioning,
+    handleViewVersions,
+    setShowVersions,
   } = actions;
 
   return (
@@ -318,20 +324,20 @@ export default function BucketScreen({ state, actions }) {
                   <button
                     type="button"
                     className="secondary"
-                    disabled={
-                      versionsLoadingKey === `${active.name}/${obj.key}`
-                    }
-                    onClick={() => handleObjectVersioning(active.name, obj.key)}
+                    disabled={versionsLoading}
+                    onClick={() => handleViewVersions(active.name, obj.key)}
                   >
-                    {versionsLoadingKey === `${active.name}/${obj.key}`
+                    {versionsLoading
                       ? "Loading versions..."
-                      : objectVersions[`${active.name}/${obj.key}`]
+                      : showVersions &&
+                          selectedObject?.bucketName === active.name &&
+                          selectedObject?.key === obj.key
                         ? "Hide versions"
                         : "View versions"}
                   </button>
                 </div>
 
-                {versionsError?.key === `${active.name}/${obj.key}` && (
+                {/* {versionsError?.key === `${active.name}/${obj.key}` && (
                   <p className="status err" role="alert">
                     {versionsError.message}
                   </p>
@@ -386,8 +392,94 @@ export default function BucketScreen({ state, actions }) {
                       )
                     )}
                   </div>
-                )}
+                )} */}
+                {showVersions && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <h2 className="text-lg font-semibold">
+                          Object Version History
+                        </h2>
 
+                        <button
+                          type="button"
+                          onClick={() => setShowVersions(false)}
+                          className="rounded-md border px-3 py-1.5"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      {selectedObject && (
+                        <p className="mb-4 break-all text-sm text-gray-500">
+                          {selectedObject.key}
+                        </p>
+                      )}
+
+                      {versionsLoading && (
+                        <p className="py-6 text-center">Loading versions...</p>
+                      )}
+
+                      {!versionsLoading && versionsError && (
+                        <p
+                          role="alert"
+                          className="rounded-md bg-red-50 p-3 text-red-700"
+                        >
+                          {versionsError}
+                        </p>
+                      )}
+
+                      {!versionsLoading &&
+                        !versionsError &&
+                        objectVersions.length === 0 && (
+                          <p className="py-6 text-center text-gray-500">
+                            No versions found for this object.
+                          </p>
+                        )}
+
+                      {!versionsLoading && objectVersions.length > 0 && (
+                        <div className="max-h-96 space-y-3 overflow-y-auto">
+                          {objectVersions.map((version) => (
+                            <div
+                              key={version.versionId}
+                              className="rounded-lg border p-4"
+                            >
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-medium">Version</span>
+
+                                <span
+                                  className={`rounded-full px-2 py-1 text-xs ${
+                                    version.isLatest
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {version.isLatest ? "Latest" : "Previous"}
+                                </span>
+                              </div>
+
+                              <p className="break-all text-sm">
+                                <span className="font-medium">ID: </span>
+                                {version.versionId || "N/A"}
+                              </p>
+
+                              <p className="mt-2 text-sm text-gray-500">
+                                <span className="font-medium">
+                                  Last modified:{" "}
+                                </span>
+                                {version.lastModified
+                                  ? new Date(
+                                      version.lastModified,
+                                    ).toLocaleString()
+                                  : "N/A"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {thumbnailKey === obj.key && thumbnailUrl && (
                   <div className="thumbnail-preview">
                     <img

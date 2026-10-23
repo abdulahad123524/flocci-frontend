@@ -35,7 +35,7 @@ function ScreenContent({ view, state, actions, blockFlags }) {
   if (view === "storage") {
     return <StorageScreen />;
   }
-  return <BackupScreen />;
+  return <BackupScreen state={state} actions={actions} />;
 }
 
 function getHeaderStats(state) {
@@ -71,7 +71,10 @@ function getHeaderStats(state) {
   if (view === "encrypt") {
     return [
       { label: "Locked bay", value: encryptBucketName || "none selected" },
-      { label: "Encryption", value: encryption?.encrypted ? encryption.algorithm : "off" },
+      {
+        label: "Encryption",
+        value: encryption?.encrypted ? encryption.algorithm : "off",
+      },
     ];
   }
   if (view === "cors") {
@@ -85,7 +88,11 @@ function getHeaderStats(state) {
       { label: "Gated bay", value: blockBucketName || "none selected" },
       {
         label: "Public access",
-        value: blockAccess?.blockAll ? "blocked" : blockAccess?.configured ? "partial" : "open",
+        value: blockAccess?.blockAll
+          ? "blocked"
+          : blockAccess?.configured
+            ? "partial"
+            : "open",
       },
     ];
   }
