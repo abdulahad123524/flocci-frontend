@@ -398,13 +398,26 @@ export default function NotificationScreen({ state, actions }) {
                       typeof message.body === "string"
                         ? JSON.parse(message.body)
                         : message.body;
+
+                    // Handle SNS → SQS → S3 notification format
+                    if (body?.Type === "Notification" && body.Message) {
+                      body =
+                        typeof body.Message === "string"
+                          ? JSON.parse(body.Message)
+                          : body.Message;
+                    }
                   } catch {
                     body = message.body;
                   }
 
                   const record = body?.Records?.[0];
                   const bucketName = record?.s3?.bucket?.name;
-                  const objectKey = record?.s3?.object?.key;
+
+                  const rawObjectKey = record?.s3?.object?.key;
+                  const objectKey = rawObjectKey
+                    ? decodeURIComponent(rawObjectKey.replace(/\+/g, " "))
+                    : undefined;
+
                   const eventName = record?.eventName;
                   const isS3Event = Boolean(record?.s3);
                   const receiveCount =
